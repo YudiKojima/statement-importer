@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/TestResults/
+.git/
+.vs/
+.vscode/
+data/
+docs/
+secrets/
+tests/
+.env
+**/Dockerfile
+compose*.yml

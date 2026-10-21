@@ -1,0 +1,61 @@
+# Desenvolvimento: docker compose -f compose.yml -f compose.dev.yml watch
+# postgres e rabbitmq entram também na rede public: porta publicada não responde em rede internal-only.
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+    networks: [internal, public]
+
+  rabbitmq:
+    ports:
+      - "15672:15672"
+    networks: [internal, public]
+
+  api:
+    build:
+      target: dev
+    image: statement-importer-api:dev
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/health"]
+      start_period: 60s
+    develop:
+      watch:
+        - action: sync
+          path: ./src/StatementImporter.Api
+          target: /src/src/StatementImporter.Api
+          ignore: [bin/, obj/]
+        - action: sync
+          path: ./src/StatementImporter.Contracts
+          target: /src/src/StatementImporter.Contracts
+          ignore: [bin/, obj/]
+        - action: rebuild
+          path: ./Directory.Packages.props
+
+  worker:
+    build:
+      target: dev
+    image: statement-importer-worker:dev
+    healthcheck:
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(stat -c %Y /tmp/heartbeat) )) -lt 30"]
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1G
+    develop:
+      watch:
+        - action: sync
+          path: ./src/StatementImporter.Worker
+          target: /src/src/StatementImporter.Worker
+          ignore: [bin/, obj/]
+        - action: sync
+          path: ./src/StatementImporter.Contracts
+          target: /src/src/StatementImporter.Contracts
+          ignore: [bin/, obj/]
+        - action: sync
+          path: ./src/StatementImporter.Data
+          target: /src/src/StatementImporter.Data
+          ignore: [bin/, obj/]
+        - action: rebuild
+          path: ./Directory.Packages.props
