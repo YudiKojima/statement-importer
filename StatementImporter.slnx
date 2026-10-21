@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/StatementImporter.Api/StatementImporter.Api.csproj" />
+    <Project Path="src/StatementImporter.Contracts/StatementImporter.Contracts.csproj" />
+    <Project Path="src/StatementImporter.Data/StatementImporter.Data.csproj" />
+    <Project Path="src/StatementImporter.Worker/StatementImporter.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/StatementImporter.IntegrationTests/StatementImporter.IntegrationTests.csproj" />
+    <Project Path="tests/StatementImporter.UnitTests/StatementImporter.UnitTests.csproj" />
+  </Folder>
+</Solution>
