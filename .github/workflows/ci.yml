@@ -33,9 +33,6 @@ jobs:
 
   stack:
     runs-on: ubuntu-24.04
-    env:
-      VERSION: ${{ github.sha }}
-      REVISION: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-dotnet@v6.0.0
@@ -46,8 +43,13 @@ jobs:
       - name: Secrets aleatórios
         run: for s in postgres_password db_owner_password db_app_password; do openssl rand -hex 24 > "secrets/$s.txt"; done
 
+      # VERSION só no passo do bake: como variável do job, o MSBuild a lê como a propriedade
+      # Version, e o dotnet run do gerador falha no restore (NU1105: SHA não é versão válida).
       - name: Build das imagens
         uses: docker/bake-action@v7.4.0
+        env:
+          VERSION: ${{ github.sha }}
+          REVISION: ${{ github.sha }}
         with:
           source: .
           files: compose.yml
@@ -88,17 +90,6 @@ jobs:
           cache-to: type=gha,scope=worker-reference,mode=max
 
       - run: docker compose pull postgres rabbitmq
-      - name: Diagnóstico temporário do gerador
-        run: |
-          env | grep -iE "nuget|dotnet|msbuild" | sort
-          ls -la ~/.nuget/NuGet 2>&1 || true
-          cat ~/.nuget/NuGet/NuGet.Config 2>&1 || true
-          dotnet build tools/generate-csv.cs -v d > /tmp/gen-build.log 2>&1 || true
-          grep -naiE "error|warn|fail|NU[0-9]{4}" /tmp/gen-build.log | tail -60
-          for f in ~/.local/share/dotnet/runfile/generate-csv-*/obj/project.assets.json; do
-            grep -n -A40 '"logs"' "$f" || echo "sem logs no assets"
-            grep -nE -A3 'ILCompiler|downloadDependencies' "$f" | head -30
-          done
       - run: dotnet run tools/generate-csv.cs -- --lines 1000000 --seed 42 --out data/1m.csv
       - run: bash proofs/run-all.sh
 
