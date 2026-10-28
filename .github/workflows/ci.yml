@@ -95,7 +95,10 @@ jobs:
           cat ~/.nuget/NuGet/NuGet.Config 2>&1 || true
           dotnet build tools/generate-csv.cs -v d > /tmp/gen-build.log 2>&1 || true
           grep -naiE "error|warn|fail|NU[0-9]{4}" /tmp/gen-build.log | tail -60
-          tail -40 /tmp/gen-build.log
+          for f in ~/.local/share/dotnet/runfile/generate-csv-*/obj/project.assets.json; do
+            grep -n -A40 '"logs"' "$f" || echo "sem logs no assets"
+            grep -nE -A3 'ILCompiler|downloadDependencies' "$f" | head -30
+          done
       - run: dotnet run tools/generate-csv.cs -- --lines 1000000 --seed 42 --out data/1m.csv
       - run: bash proofs/run-all.sh
 
