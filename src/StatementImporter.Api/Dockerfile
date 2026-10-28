@@ -21,6 +21,15 @@ FROM build AS publish
 RUN dotnet publish src/StatementImporter.Api/StatementImporter.Api.csproj -c Release -r linux-x64 --no-restore -o /out \
  && mkdir /empty
 
+FROM build AS publish-reference
+RUN dotnet publish src/StatementImporter.Api/StatementImporter.Api.csproj -c Release -r linux-x64 --self-contained false -p:PublishAot=false -o /out
+
+# Só para o CI: a mesma api sem AOT na imagem padrão, para comparar CVEs com a chiseled. Nunca publicada.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS reference
+WORKDIR /app
+COPY --from=publish-reference /out ./
+ENTRYPOINT ["dotnet", "StatementImporter.Api.dll"]
+
 FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled AS runtime
 ARG VERSION=dev
 ARG REVISION=unknown

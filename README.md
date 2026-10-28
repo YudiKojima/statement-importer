@@ -1,12 +1,14 @@
 # statement-importer
 
-> README provisório. O README completo, com demo e badge do CI, chega na fase 04.
+[![ci](https://github.com/YudiKojima/statement-importer/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/YudiKojima/statement-importer/actions/workflows/ci.yml)
+
+> README provisório. O README completo, com demo, chega na fase 04.
 
 Importar um CSV grande dentro da requisição HTTP dá timeout, duplica dados quando o usuário reenvia e não mostra progresso. Este projeto resolve isso com um pipeline assíncrono: a API grava o arquivo e responde na hora, e workers processam o CSV em blocos idempotentes.
 
 É um projeto de portfólio de Docker em .NET 10: cada conceito (imagem, build, volume, rede, compose) aparece por uma necessidade real do sistema.
 
-## O que existe hoje (fase 01)
+## O que existe hoje (fases 01 e 03)
 
 - **api**: Minimal API em Native AOT, imagem chiseled sem shell. Recebe o upload em streaming, calcula o SHA-256 e publica na fila.
 - **worker**: EF Core, consome a fila e processa blocos de 10.000 linhas. Ack só depois do commit, então um worker morto não duplica dados.
@@ -14,6 +16,8 @@ Importar um CSV grande dentro da requisição HTTP dá timeout, duplica dados qu
 - **postgres 17** e **rabbitmq 4** (quorum queues), só na rede interna.
 - `compose.dev.yml` com Compose Watch para desenvolvimento.
 - 39 testes unitários e 21 de integração com Testcontainers (Postgres e RabbitMQ reais).
+- Papéis de banco com privilégio mínimo: `api` e `worker` só leem e gravam dados; o `migrator` é dono do schema; ninguém usa o superusuário.
+- Provas executáveis em `proofs/` e CI no GitHub Actions com Trivy e publicação no GHCR.
 
 ```mermaid
 flowchart LR
@@ -40,9 +44,11 @@ flowchart LR
 Requisitos: Docker com Compose e o SDK do .NET 10 (só para o gerador de CSV).
 
 ```bash
-cp secrets/db_password.txt.example secrets/db_password.txt
+for s in postgres_password db_owner_password db_app_password; do cp secrets/$s.txt.example secrets/$s.txt; done
 docker compose up -d --wait
 ```
+
+Se você já subiu o stack da fase 01, rode `docker compose down -v` uma vez antes: o script que cria os papéis do banco só executa com o `pgdata` vazio.
 
 Gerar um CSV de 1 milhão de linhas e enviar:
 
@@ -68,10 +74,22 @@ Feitas no stack real, com o `compose.yml` deste repositório.
 | RabbitMQ parado | `api` e `worker` reiniciam pelo restart policy e voltam `healthy` |
 | Fila `process-chunk` esvaziada à força | o reconciliador republica os 81 blocos pendentes |
 | Upload acima de 200 MB | `413`, sem deixar arquivo para trás |
-| Tamanho comprimido das imagens | `api` 17 MB · `worker` 45 MB · `migrator` 50 MB |
+| Tamanho comprimido das imagens | `api` 18,0 MB · `worker` 46,6 MB · `migrator` 50,6 MB |
 | Usuário dos containers de app | UID 1654 (não root) |
 
-Por enquanto, essas medições foram feitas à mão. Na fase 03 elas viram provas executáveis em `proofs/`, rodando no CI do GitHub Actions.
+As linhas de 1M de linhas (escala e worker morto), tamanho das imagens e usuário dos containers são verificadas por provas executáveis em [`proofs/`](proofs/), a cada push, no [CI](.github/workflows/ci.yml), junto com rede, volume, privilégios do banco e saúde do stack. As linhas de RabbitMQ parado, reconciliador e upload acima de 200 MB foram medidas à mão na fase 01. O job summary de cada execução traz os tamanhos, os tempos de 1 × 3 workers e a comparação de CVEs entre as imagens chiseled e as imagens padrão.
+
+## Como rodar as provas
+
+Com o stack em pé (seção anterior):
+
+```bash
+bash proofs/run-all.sh
+```
+
+Leva alguns minutos: inclui três importações de 1M de linhas. Cada prova também roda sozinha, por exemplo `bash proofs/resilience.sh`.
+
+Se a máquina já usa as portas 5432, 5672 ou 15672 (um Postgres nativo, por exemplo), ignore-as na prova de rede: `IGNORE_HOST_PORTS=5432 bash proofs/run-all.sh`. O CI nunca define essa variável.
 
 ## Documentação
 

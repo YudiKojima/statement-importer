@@ -23,6 +23,12 @@ FROM build AS publish
 RUN dotnet publish src/StatementImporter.Worker/StatementImporter.Worker.csproj -c Release -r linux-x64 --self-contained false --no-restore -o /out \
  && mkdir /empty
 
+# Só para o CI: o mesmo worker na imagem padrão, para comparar CVEs com a chiseled. Nunca publicada.
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS reference
+WORKDIR /app
+COPY --from=publish /out ./
+ENTRYPOINT ["dotnet", "StatementImporter.Worker.dll"]
+
 FROM mcr.microsoft.com/dotnet/runtime:10.0-noble-chiseled AS runtime
 ARG VERSION=dev
 ARG REVISION=unknown

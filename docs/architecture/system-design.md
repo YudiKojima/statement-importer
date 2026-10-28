@@ -56,7 +56,9 @@ statement-importer/
 ├─ tools/generate-csv.cs              file-based app .NET 10 para gerar arquivos de demo
 ├─ proofs/                            provas executáveis (bash)
 ├─ docker/nginx.conf
-├─ secrets/db_password.txt.example
+├─ docker/postgres/init-roles.sh      cria os papéis do Postgres no primeiro boot
+├─ .github/scripts/trivy-report.sh    contagem de CVEs para o job summary
+├─ secrets/*.txt.example
 ├─ compose.yml                        stack de produção
 ├─ compose.dev.yml                    desenvolvimento (Compose Watch + dotnet watch, portas de debug)
 ├─ Directory.Build.props / Directory.Packages.props
@@ -183,8 +185,8 @@ Duplicatas são inofensivas (`FOR UPDATE` + bloco `done`) e não consomem tentat
 
 - Arquivos de `/run/secrets` lidos pelo provider `KeyPerFile` do .NET. O secret `Db__Password` vira a chave `Db:Password`.
 - A conexão é montada com `NpgsqlConnectionStringBuilder` a partir de `Db:Host`, `Db:Database`, `Db:Username` (variáveis de ambiente) + `Db:Password` (secret).
-- O Postgres lê o mesmo arquivo via `POSTGRES_PASSWORD_FILE=/run/secrets/Db__Password`.
-- No compose: `secrets: Db__Password: file: ./secrets/db_password.txt`. O arquivo real fica no `.gitignore`; `secrets/db_password.txt.example` é commitado. O CI gera um valor aleatório.
+- Papéis do Postgres ([ADR 0006](decisions/0006-papeis-de-banco-com-privilegio-minimo.md)): `postgres` (superusuário, só bootstrap), `importer_owner` (dono do schema, usado pelo `migrator`) e `importer_app` (DML e `TEMP`, usado por `api` e `worker`), criados por `docker/postgres/init-roles.sh` no primeiro boot.
+- Três secrets: `secrets/postgres_password.txt`, `secrets/db_owner_password.txt` e `secrets/db_app_password.txt` (no `.gitignore`; os `.example` são commitados). Cada serviço monta o seu com `target: Db__Password`, que vira a chave `Db:Password`; `Db__Username` define o papel. O CI gera valores aleatórios.
 - RabbitMQ usa credenciais de desenvolvimento por variáveis de ambiente (não expostas fora da rede interna).
 - `KeyPerFile` já vem no shared framework do ASP.NET (a `api` não referencia o pacote); o `worker`, que não é web, referencia `Microsoft.Extensions.Configuration.KeyPerFile`.
 
@@ -194,7 +196,7 @@ Imagens chiseled não têm ICU nem `tzdata`. `api`, `worker` e `migrator` usam `
 
 ### Fora do escopo
 
-Usuário de banco com privilégio mínimo (hoje as aplicações usam o `POSTGRES_USER`, que é superusuário; candidato à fase 03), autenticação, multiusuário, retenção/limpeza de arquivos em `uploads`, reprocessar uma importação `failed` (reenviar o mesmo arquivo devolve a importação que falhou), outros formatos (OFX, Excel), deploy em nuvem, Kubernetes, dashboards de métricas.
+Autenticação, multiusuário, retenção/limpeza de arquivos em `uploads`, reprocessar uma importação `failed` (reenviar o mesmo arquivo devolve a importação que falhou), outros formatos (OFX, Excel), deploy em nuvem, Kubernetes, dashboards de métricas.
 
 ---
 
@@ -272,8 +274,8 @@ Rodam contra o stack em pé; `proofs/run-all.sh` executa todas. Funcionam no CI 
 |---|---|
 | `healthy.sh` | todos os serviços `healthy` em até 60 s |
 | `image-size.sh` | metas de tamanho da Seção 3 (falha se passar) |
-| `security.sh` | nenhum container de app roda como root; `api` e `worker` sem shell |
-| `network.sh` | só `proxy` publica porta; Postgres, RabbitMQ e API inacessíveis do host |
+| `security.sh` | nenhum container de app roda como root; `api` e `worker` sem shell; `importer_app` não é superusuário e não consegue `DROP TABLE` |
+| `network.sh` | só `proxy` publica porta; Postgres, RabbitMQ e API inacessíveis do host. Até a fase 02, a `api` é a exceção que publica a 8080. |
 | `volume.sh` | importa → `compose down` (sem `-v`) → `up` → dados continuam lá |
 | `resilience.sh` | com 3 workers, importação de 1M de linhas e `docker kill` num worker no meio (ele fica parado; os outros dois assumem os blocos). No fim, total gravado = linhas válidas exatamente |
 | `scale.sh` | mede 1 vs 3 workers e escreve a tabela (só reporta, não falha) |
@@ -290,7 +292,7 @@ Em todo push e PR:
 3. `docker compose up -d --wait`, `proofs/run-all.sh`; tamanhos das imagens e tempos de 1 vs 3 workers no **job summary**.
 4. Trivy em `api` e `worker`, comparados com builds de referência na imagem padrão (target `reference` em cada Dockerfile: publish sem AOT sobre `aspnet:10.0` para a api e `runtime:10.0` para o worker) → contagem de CVEs no job summary. A referência só é buildada no CI e nunca publicada.
 
-Somente em push na `master`: publica `ghcr.io/yudikojima/statement-importer-{api,worker,web,migrator}` com tags `sha-<curto>` e `latest`.
+Somente em push na `master`: publica `ghcr.io/yudikojima/statement-importer-{api,worker,migrator}` com tags `sha-<curto>` e `latest` (a `web` entra na fase 02). O gate do Trivy falha só com CVE `CRITICAL` com correção disponível ([ADR 0007](decisions/0007-provas-executaveis-contra-o-stack-real.md)).
 
 ### README (entregável de portfólio)
 
