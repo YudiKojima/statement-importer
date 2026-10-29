@@ -1,0 +1,160 @@
+@page "/imports/{Id:guid}"
+@implements IDisposable
+@inject ImportsApi Api
+
+<PageTitle>Importação</PageTitle>
+<p><a href="">← Importações</a></p>
+
+@if (notFound)
+{
+    <h1>Importação não encontrada</h1>
+}
+else if (import is null)
+{
+    <p>Carregando…</p>
+}
+else
+{
+    <h1>@import.FileName</h1>
+    @if (Existente)
+    {
+        <p class="message">Este arquivo já tinha sido enviado; esta é a importação existente.</p>
+    }
+
+    <section class="card">
+        <p><StatusBadge Status="@import.Status" /></p>
+        <progress max="100" value="@Percent"></progress>
+        <span>@Percent% processado</span>
+        <dl class="counters">
+            <div><dt>Linhas</dt><dd>@import.TotalLines.ToString("N0")</dd></div>
+            <div><dt>Processadas</dt><dd>@import.ProcessedLines.ToString("N0")</dd></div>
+            <div><dt>Válidas</dt><dd>@import.ValidCount.ToString("N0")</dd></div>
+            <div><dt>Rejeitadas</dt><dd>@import.ErrorCount.ToString("N0")</dd></div>
+        </dl>
+        @if (import.FailureReason is { } reason)
+        {
+            <p class="message error">@reason</p>
+        }
+    </section>
+
+    <nav class="tabs">
+        <button class="@(tab == Tab.Errors ? "active" : null)" @onclick="() => ShowAsync(Tab.Errors)">Linhas rejeitadas</button>
+        <button class="@(tab == Tab.Transactions ? "active" : null)" @onclick="() => ShowAsync(Tab.Transactions)">Transações</button>
+    </nav>
+
+    @if (tab == Tab.Errors && errors is not null)
+    {
+        <table>
+            <thead><tr><th class="num">Linha</th><th>Motivo</th><th>Conteúdo</th></tr></thead>
+            <tbody>
+                @foreach (var error in errors.Items)
+                {
+                    <tr><td class="num">@error.LineNumber</td><td>@error.Reason</td><td><code>@error.RawLine</code></td></tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page" Total="errors.Total" PageSize="ImportsApi.PageSize" Changed="GoToPageAsync" />
+    }
+    else if (tab == Tab.Transactions && transactions is not null)
+    {
+        <table>
+            <thead>
+                <tr><th class="num">Linha</th><th>ID</th><th>Data</th><th>Descrição</th><th class="num">Valor</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var transaction in transactions.Items)
+                {
+                    <tr>
+                        <td class="num">@transaction.LineNumber</td>
+                        <td>@transaction.TransactionId</td>
+                        <td>@transaction.Date</td>
+                        <td>@transaction.Description</td>
+                        <td class="num">@transaction.Amount.ToString("N2")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page" Total="transactions.Total" PageSize="ImportsApi.PageSize" Changed="GoToPageAsync" />
+    }
+}
+
+@code {
+    private enum Tab { Errors, Transactions }
+
+    [Parameter] public Guid Id { get; set; }
+    [SupplyParameterFromQuery] public bool Existente { get; set; }
+
+    private readonly CancellationTokenSource stop = new();
+    private ImportResponse? import;
+    private bool notFound;
+    private Tab tab = Tab.Errors;
+    private int page = 1;
+    private PagedResponse<ImportErrorResponse>? errors;
+    private PagedResponse<TransactionResponse>? transactions;
+
+    private bool IsRunning => import?.Status is ImportStatus.Queued or ImportStatus.Processing;
+
+    private int Percent => import is null ? 0
+        : import.TotalLines == 0 ? (IsRunning ? 0 : 100)
+        : (int)(100L * import.ProcessedLines / import.TotalLines);
+
+    protected override async Task OnInitializedAsync()
+    {
+        import = await Api.GetAsync(Id);
+        notFound = import is null;
+        if (notFound)
+            return;
+        await LoadTabAsync();
+        _ = PollAsync();
+    }
+
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1.5));
+        try
+        {
+            while (IsRunning && await timer.WaitForNextTickAsync(stop.Token))
+            {
+                try
+                {
+                    import = await Api.GetAsync(Id) ?? import;
+                    if (!IsRunning)
+                        await LoadTabAsync();
+                }
+                catch (HttpRequestException)
+                {
+                }
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task ShowAsync(Tab next)
+    {
+        tab = next;
+        page = 1;
+        await LoadTabAsync();
+    }
+
+    private async Task GoToPageAsync(int next)
+    {
+        page = next;
+        await LoadTabAsync();
+    }
+
+    private async Task LoadTabAsync()
+    {
+        if (tab == Tab.Errors)
+            errors = await Api.GetErrorsAsync(Id, page);
+        else
+            transactions = await Api.GetTransactionsAsync(Id, page);
+    }
+
+    public void Dispose()
+    {
+        stop.Cancel();
+    }
+}

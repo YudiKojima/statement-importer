@@ -112,7 +112,7 @@ Linhas em branco são ignoradas e não contam como erro. **`total_lines` = linha
 ### Passo a passo
 
 1. **Upload — `POST /api/imports?fileName=extrato.csv`** (corpo = arquivo bruto, `Content-Type: text/csv`)
-   - Limite de corpo de **200 MB** configurado no Kestrel (`MaxRequestBodySize`, cujo padrão é 30 MB) e, na fase 02, no Nginx (`client_max_body_size`, padrão 1 MB, e `proxy_request_buffering off` para o upload seguir em streaming até a API, sem o Nginx bufferizar o arquivo inteiro em disco).
+   - Limite de corpo de **200 MB** configurado no Kestrel (`MaxRequestBodySize`, cujo padrão é 30 MB) e no Nginx (`client_max_body_size`, padrão 1 MB, e `proxy_request_buffering off` para o upload seguir em streaming até a API, sem o Nginx bufferizar o arquivo inteiro em disco).
    - A API lê a primeira linha do stream; cabeçalho diferente do esperado → `400` imediato.
    - Copia o restante do stream para `/data/uploads/{importId}.csv` calculando SHA-256 incrementalmente (nunca carrega o arquivo em memória).
    - `INSERT ... ON CONFLICT (file_hash) DO NOTHING RETURNING id`. Se o hash já existe: apaga o arquivo recém-gravado e responde `200` com a importação existente.
@@ -154,9 +154,9 @@ Se o container morre no meio do passo 3, a transação não foi commitada (nada 
 | `GET` | `/api/imports/{id}/errors?page=&pageSize=` | linhas rejeitadas paginadas (`pageSize` máx. 100) |
 | `GET` | `/api/transactions?importId=&page=&pageSize=` | transações importadas paginadas |
 | `GET` | `/health` | `200` se o processo responde e o banco aceita conexão |
-| `GET` | `/api/docs` | documentação interativa (Scalar sobre OpenAPI) |
+| `GET` | `/api/docs` | documentação interativa (Scalar sobre o OpenAPI em `/api/openapi/v1.json`) |
 
-JSON serializado com `System.Text.Json` source-generated (`JsonSerializerContext`), requisito do AOT.
+JSON serializado com `System.Text.Json` source-generated (`JsonSerializerContext`), requisito do AOT. O gerador de OpenAPI também pede metadados dos parâmetros de query, por isso o `ContractsJsonContext` inclui `Guid?` e `int?`; sem eles, o documento devolvia 500 no Native AOT.
 
 ### Fila
 
@@ -214,9 +214,9 @@ publish  → dotnet publish
 runtime  → imagem final mínima                  (target do compose.yml)
 ```
 
-Mudar código não invalida a camada de `restore`. O `migrator` não tem estágio `dev`.
+Mudar código não invalida a camada de `restore`. O `migrator` e o `proxy` não têm estágio `dev`; o `proxy` tem Dockerfile próprio (publish do WASM → nginx).
 
-**Desenvolvimento:** `docker compose -f compose.yml -f compose.dev.yml watch`. O arquivo se chama `compose.dev.yml`, e não `compose.override.yml`, porque o override é carregado automaticamente por qualquer `docker compose up`: o CI e as provas acabariam rodando as imagens de dev. O Compose Watch sincroniza `src/` para dentro do container (sem bind mount, então `bin/` e `obj/` do Windows não se misturam com os do Linux), e o `dotnet watch` recompila. Medido: ~9 s da edição até a resposta nova.
+**Desenvolvimento:** `docker compose -f compose.yml -f compose.dev.yml watch`. O arquivo se chama `compose.dev.yml`, e não `compose.override.yml`, porque o override é carregado automaticamente por qualquer `docker compose up`: o CI e as provas acabariam rodando as imagens de dev. O Compose Watch sincroniza `src/` para dentro do container (sem bind mount, então `bin/` e `obj/` do Windows não se misturam com os do Linux), e o `dotnet watch` recompila. Medido: ~9 s da edição até a resposta nova. No `proxy` o watch faz `rebuild` da imagem: ~24 s da edição à resposta nova.
 
 ### Imagem final por serviço
 
@@ -227,7 +227,7 @@ Mudar código não invalida a camada de `restore`. O `migrator` não tem estági
 | `api` | `runtime-deps:10.0-noble-chiseled` (5 MB) + AOT | < 25 MB | Exposta ao tráfego: startup rápido, pouca memória, superfície mínima. Spike com todas as dependências: 17 MB |
 | `worker` | `runtime:10.0-noble-chiseled` (42 MB) | < 70 MB | EF Core depende de reflection → sem AOT, mas chiseled e sem root |
 | `migrator` | `runtime-deps:10.0-noble-chiseled` (5 MB) + bundle self-contained | < 60 MB | Executa uma vez e sai |
-| `proxy` | `nginxinc/nginx-unprivileged:1.29-alpine` (23 MB) | < 40 MB | Runtime final não é .NET; versão sem root (UID 101), escuta na 8080 |
+| `proxy` | `nginxinc/nginx-unprivileged:1.29-alpine` (23 MB) | < 40 MB | Runtime final não é .NET; versão sem root (UID 101), escuta na 8080. Medido: 28,4 MB |
 
 As metas são calibradas no primeiro build real de cada serviço (fases 01 e 02) e fixadas no `image-size.sh`.
 
@@ -243,7 +243,7 @@ Decisões: [ADR 0001](decisions/0001-api-aot-worker-ef-core.md), [ADR 0002](deci
 
 - `api`: `HEALTHCHECK CMD ["/app/StatementImporter.Api", "--healthcheck"]` — o binário detecta a flag, faz `GET http://localhost:8080/health` e sai com `0`/`1`.
 - `worker`: grava `/tmp/heartbeat` a cada 10 s no loop do consumidor; `--healthcheck` sai com `0` se o arquivo foi modificado nos últimos 30 s.
-- `postgres`: `pg_isready`. `rabbitmq`: `rabbitmq-diagnostics -q ping`. `proxy`: `wget -q --spider http://localhost:8080/`.
+- `postgres`: `pg_isready`. `rabbitmq`: `rabbitmq-diagnostics -q ping`. `proxy`: `wget -q --spider http://127.0.0.1:8080/` (IPv4 explícito: o `wget` do busybox resolve `localhost` para `::1` primeiro, e o nginx escuta só em IPv4).
 
 ### Compose
 
@@ -274,8 +274,9 @@ Rodam contra o stack em pé; `proofs/run-all.sh` executa todas. Funcionam no CI 
 |---|---|
 | `healthy.sh` | todos os serviços `healthy` em até 60 s |
 | `image-size.sh` | metas de tamanho da Seção 3 (falha se passar) |
-| `security.sh` | nenhum container de app roda como root; `api` e `worker` sem shell; `importer_app` não é superusuário e não consegue `DROP TABLE` |
-| `network.sh` | só `proxy` publica porta; Postgres, RabbitMQ e API inacessíveis do host. Até a fase 02, a `api` é a exceção que publica a 8080. |
+| `security.sh` | nenhum container de app (inclusive o `proxy`) roda como root; `api` e `worker` sem shell; `importer_app` não é superusuário e não consegue `DROP TABLE` |
+| `network.sh` | só `proxy` publica porta; Postgres, RabbitMQ e API inacessíveis do host; a `api` só na rede `internal` |
+| `proxy.sh` | index e fallback do SPA, /api e /api/docs via proxy, upload acima de 200 MiB → 413 |
 | `volume.sh` | importa → `compose down` (sem `-v`) → `up` → dados continuam lá |
 | `resilience.sh` | com 3 workers, importação de 1M de linhas e `docker kill` num worker no meio (ele fica parado; os outros dois assumem os blocos). No fim, total gravado = linhas válidas exatamente |
 | `scale.sh` | mede 1 vs 3 workers e escreve a tabela (só reporta, não falha) |
@@ -292,7 +293,7 @@ Em todo push e PR:
 3. `docker compose up -d --wait`, `proofs/run-all.sh`; tamanhos das imagens e tempos de 1 vs 3 workers no **job summary**.
 4. Trivy em `api` e `worker`, comparados com builds de referência na imagem padrão (target `reference` em cada Dockerfile: publish sem AOT sobre `aspnet:10.0` para a api e `runtime:10.0` para o worker) → contagem de CVEs no job summary. A referência só é buildada no CI e nunca publicada.
 
-Somente em push na `master`: publica `ghcr.io/yudikojima/statement-importer-{api,worker,migrator}` com tags `sha-<curto>` e `latest` (a `web` entra na fase 02). O gate do Trivy falha só com CVE `CRITICAL` com correção disponível ([ADR 0007](decisions/0007-provas-executaveis-contra-o-stack-real.md)).
+Somente em push na `master`: publica `ghcr.io/yudikojima/statement-importer-{api,worker,migrator,proxy}` com tags `sha-<curto>` e `latest`. O gate do Trivy falha só com CVE `CRITICAL` com correção disponível ([ADR 0007](decisions/0007-provas-executaveis-contra-o-stack-real.md)).
 
 ### README (entregável de portfólio)
 

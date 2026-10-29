@@ -16,8 +16,9 @@ Pasta: [`features/01-pipeline-core/`](features/01-pipeline-core/)
 Scripts em `proofs/`, workflow do GitHub Actions com testes, provas, job summary com medições, Trivy e publicação no GHCR; usuários de banco com privilégio mínimo. Executada **antes** da fase 02: a prova automatizada é o diferencial do portfólio, e o CI passa a proteger a fase 02.
 Pasta: [`features/03-provas-e-ci/`](features/03-provas-e-ci/)
 
-### 02 — Frontend e reverse proxy
+### 02 — Frontend e reverse proxy ✅ Concluída (2026-10-28)
 Blazor WebAssembly servido por `nginx-unprivileged`, que também faz proxy de `/api`. A `api` deixa de publicar porta; só o `proxy` fica exposto. Redes `public` e `internal` na forma final. O `network.sh` passa a exigir que só o `proxy` publique porta.
+Pasta: [`features/02-frontend-e-proxy/`](features/02-frontend-e-proxy/)
 
 ### 04 — README de portfólio e demo
 README com diagrama, medições, decisões (links para os ADRs), GIF da demo e badge do CI.

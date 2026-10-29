@@ -8,9 +8,10 @@ Importar um CSV grande dentro da requisição HTTP dá timeout, duplica dados qu
 
 É um projeto de portfólio de Docker em .NET 10: cada conceito (imagem, build, volume, rede, compose) aparece por uma necessidade real do sistema.
 
-## O que existe hoje (fases 01 e 03)
+## O que existe hoje (fases 01, 03 e 02)
 
-- **api**: Minimal API em Native AOT, imagem chiseled sem shell. Recebe o upload em streaming, calcula o SHA-256 e publica na fila.
+- **proxy**: nginx sem root, serve o frontend Blazor WebAssembly e repassa /api para a api. Única porta publicada (8080).
+- **api**: Minimal API em Native AOT, imagem chiseled sem shell, só na rede interna. Recebe o upload em streaming, calcula o SHA-256 e publica na fila.
 - **worker**: EF Core, consome a fila e processa blocos de 10.000 linhas. Ack só depois do commit, então um worker morto não duplica dados.
 - **migrator**: bundle de migrations do EF Core, roda uma vez e sai antes de `api` e `worker` subirem.
 - **postgres 17** e **rabbitmq 4** (quorum queues), só na rede interna.
@@ -21,7 +22,10 @@ Importar um CSV grande dentro da requisição HTTP dá timeout, duplica dados qu
 
 ```mermaid
 flowchart LR
-    client([cliente]) -- "POST /api/imports :8080" --> api
+    browser([navegador]) -- ":8080" --> proxy
+    subgraph public [rede public]
+        proxy[proxy<br/>nginx + Blazor WASM]
+    end
     subgraph internal [rede internal]
         api[api<br/>Native AOT]
         worker[worker<br/>EF Core]
@@ -30,6 +34,7 @@ flowchart LR
         rabbitmq[[rabbitmq]]
         uploads[(volume uploads)]
     end
+    proxy -- "/api" --> api
     api -- grava CSV --> uploads
     uploads -- lê CSV --> worker
     api -- ImportRequested --> rabbitmq
@@ -50,7 +55,9 @@ docker compose up -d --wait
 
 Se você já subiu o stack da fase 01, rode `docker compose down -v` uma vez antes: o script que cria os papéis do banco só executa com o `pgdata` vazio.
 
-Gerar um CSV de 1 milhão de linhas e enviar:
+A interface fica em `http://localhost:8080`: upload, progresso, linhas rejeitadas e transações importadas.
+
+Como alternativa, gere um CSV de 1 milhão de linhas e envie pelo `curl` (que passa pelo proxy):
 
 ```bash
 dotnet run tools/generate-csv.cs -- --lines 1000000 --seed 42 --out data/1m.csv
@@ -74,10 +81,10 @@ Feitas no stack real, com o `compose.yml` deste repositório.
 | RabbitMQ parado | `api` e `worker` reiniciam pelo restart policy e voltam `healthy` |
 | Fila `process-chunk` esvaziada à força | o reconciliador republica os 81 blocos pendentes |
 | Upload acima de 200 MB | `413`, sem deixar arquivo para trás |
-| Tamanho comprimido das imagens | `api` 18,0 MB · `worker` 46,6 MB · `migrator` 50,6 MB |
-| Usuário dos containers de app | UID 1654 (não root) |
+| Tamanho comprimido das imagens | `api` 18,0 MB · `worker` 46,6 MB · `migrator` 50,6 MB · `proxy` 28,4 MB |
+| Usuário dos containers de app | UID 1654 (não root); UID 101 no proxy |
 
-As linhas de 1M de linhas (escala e worker morto), tamanho das imagens e usuário dos containers são verificadas por provas executáveis em [`proofs/`](proofs/), a cada push, no [CI](.github/workflows/ci.yml), junto com rede, volume, privilégios do banco e saúde do stack. As linhas de RabbitMQ parado, reconciliador e upload acima de 200 MB foram medidas à mão na fase 01. O job summary de cada execução traz os tamanhos, os tempos de 1 × 3 workers e a comparação de CVEs entre as imagens chiseled e as imagens padrão.
+As linhas de 1M de linhas (escala e worker morto), upload acima de 200 MB (o `413` sai do nginx), tamanho das imagens e usuário dos containers são verificadas por provas executáveis em [`proofs/`](proofs/), a cada push, no [CI](.github/workflows/ci.yml), junto com rede, volume, privilégios do banco e saúde do stack. As linhas de RabbitMQ parado e reconciliador foram medidas à mão na fase 01. O job summary de cada execução traz os tamanhos, os tempos de 1 × 3 workers e a comparação de CVEs entre as imagens chiseled e as imagens padrão.
 
 ## Como rodar as provas
 
@@ -94,5 +101,5 @@ Se a máquina já usa as portas 5432, 5672 ou 15672 (um Postgres nativo, por exe
 ## Documentação
 
 - [System design](docs/architecture/system-design.md): serviços, fluxo de dados, imagens, testes e CI.
-- [Decisões de arquitetura (ADRs)](docs/architecture/decisions/): por que AOT na api, healthcheck pelo próprio binário, blocos idempotentes, limite de recursos no worker e migrator one-shot.
+- [Decisões de arquitetura (ADRs)](docs/architecture/decisions/): por que AOT na api, healthcheck pelo próprio binário, blocos idempotentes, limite de recursos no worker, migrator one-shot, papéis de banco com privilégio mínimo, provas contra o stack real e proxy como única borda.
 - [Visão do projeto e fases](docs/project-overview.md).

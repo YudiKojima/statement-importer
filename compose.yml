@@ -80,15 +80,13 @@ services:
         target: Db__Password
     volumes:
       - uploads:/data/uploads
-    ports:
-      - "8080:8080"
     depends_on:
       migrator:
         condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
     restart: unless-stopped
-    networks: [internal, public]
+    networks: [internal]
 
   worker:
     build:
@@ -117,6 +115,21 @@ services:
           cpus: "0.5"
           memory: 256M
     networks: [internal]
+
+  proxy:
+    build:
+      context: .
+      dockerfile: src/StatementImporter.Web/Dockerfile
+      target: runtime
+      args: *build-args
+    image: ghcr.io/yudikojima/statement-importer-proxy:${TAG:-local}
+    ports:
+      - "8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [public, internal]
 
 secrets:
   postgres_password:

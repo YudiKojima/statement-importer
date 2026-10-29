@@ -4,6 +4,7 @@
     <Project Path="src/StatementImporter.Contracts/StatementImporter.Contracts.csproj" />
     <Project Path="src/StatementImporter.Data/StatementImporter.Data.csproj" />
     <Project Path="src/StatementImporter.Worker/StatementImporter.Worker.csproj" />
+    <Project Path="src/StatementImporter.Web/StatementImporter.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/StatementImporter.IntegrationTests/StatementImporter.IntegrationTests.csproj" />

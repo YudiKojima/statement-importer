@@ -22,6 +22,7 @@ Ao tomar uma decisão que afeta mais de um arquivo ou que alguém poderia questi
 | [0005](0005-schema-do-ef-core-aplicado-por-migrator.md) | Schema dono do EF Core, aplicado por container migrator one-shot |
 | [0006](0006-papeis-de-banco-com-privilegio-minimo.md) | Papéis de banco com privilégio mínimo: superusuário só no bootstrap |
 | [0007](0007-provas-executaveis-contra-o-stack-real.md) | Provas executáveis em bash contra o stack real; Trivy comparativo |
+| [0008](0008-proxy-como-unica-borda.md) | Proxy nginx como única borda: estáticos do Blazor e `/api` na mesma origem |
 
 ## Template
 

@@ -13,4 +13,7 @@ namespace StatementImporter.Contracts;
 [JsonSerializable(typeof(PagedResponse<ImportErrorResponse>))]
 [JsonSerializable(typeof(PagedResponse<TransactionResponse>))]
 [JsonSerializable(typeof(ErrorResponse))]
+// Parâmetros de query (importId, page, pageSize): o gerador de OpenAPI sob AOT pede os metadados deles.
+[JsonSerializable(typeof(Guid?))]
+[JsonSerializable(typeof(int?))]
 public partial class ContractsJsonContext : JsonSerializerContext;

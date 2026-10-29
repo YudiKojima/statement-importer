@@ -2,7 +2,7 @@
 # Containers de app sem root e sem shell; api e worker conectam com um papel sem privilégio de dono.
 source "$(dirname "$0")/lib.sh"
 
-for svc in api worker migrator; do
+for svc in api worker migrator proxy; do
   user=$(docker image inspect -f '{{.Config.User}}' "$(image "$svc")")
   case "$user" in ""|root|0|0:0) fail "$svc roda como root (User='$user')" ;; esac
 done
@@ -28,4 +28,4 @@ if drop_out=$(app_sql 'begin; drop table transactions; rollback;' 2>&1); then
 fi
 case "$drop_out" in *"must be owner of table transactions"*) ;; *) fail "DROP negado por outro motivo: $drop_out" ;; esac
 
-pass "api, worker e migrator sem root; api e worker sem shell; importer_app só com DML"
+pass "api, worker, migrator e proxy sem root; api e worker sem shell; importer_app só com DML"
