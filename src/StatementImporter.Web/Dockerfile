@@ -14,7 +14,12 @@ COPY src/StatementImporter.Web/ src/StatementImporter.Web/
 RUN dotnet publish src/StatementImporter.Web/StatementImporter.Web.csproj -c Release --no-restore -o /out \
  && find /out/wwwroot -name '*.br' -delete
 
-FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.30-alpine AS runtime
+# A tag da base não é reconstruída a cada correção do Alpine (ex.: brotli-libs com CVE CRITICAL);
+# o upgrade traz os pacotes corrigidos sem esperar a imagem oficial.
+USER root
+RUN apk upgrade --no-cache
+USER 101
 ARG VERSION=dev
 ARG REVISION=unknown
 LABEL org.opencontainers.image.source="https://github.com/YudiKojima/statement-importer" \

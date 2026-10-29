@@ -81,7 +81,7 @@ Feitas no stack real, com o `compose.yml` deste repositório.
 | RabbitMQ parado | `api` e `worker` reiniciam pelo restart policy e voltam `healthy` |
 | Fila `process-chunk` esvaziada à força | o reconciliador republica os 81 blocos pendentes |
 | Upload acima de 200 MB | `413`, sem deixar arquivo para trás |
-| Tamanho comprimido das imagens | `api` 18,0 MB · `worker` 46,6 MB · `migrator` 50,6 MB · `proxy` 28,4 MB |
+| Tamanho comprimido das imagens | `api` 18,0 MB · `worker` 46,6 MB · `migrator` 50,6 MB · `proxy` 32,7 MB |
 | Usuário dos containers de app | UID 1654 (não root); UID 101 no proxy |
 
 As linhas de 1M de linhas (escala e worker morto), upload acima de 200 MB (o `413` sai do nginx), tamanho das imagens e usuário dos containers são verificadas por provas executáveis em [`proofs/`](proofs/), a cada push, no [CI](.github/workflows/ci.yml), junto com rede, volume, privilégios do banco e saúde do stack. As linhas de RabbitMQ parado e reconciliador foram medidas à mão na fase 01. O job summary de cada execução traz os tamanhos, os tempos de 1 × 3 workers e a comparação de CVEs entre as imagens chiseled e as imagens padrão.

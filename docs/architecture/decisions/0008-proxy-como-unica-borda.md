@@ -10,7 +10,7 @@ Até a fase 02, a `api` publicava a 8080 e era a porta de entrada do sistema. O 
 
 ## Decisão
 
-Um único serviço `proxy` (`nginxinc/nginx-unprivileged:1.29-alpine`) serve os estáticos do Blazor e repassa `/api/` para a `api` na rede `internal`. Só ele publica porta e só ele está na rede `public`. O nginx usa `client_max_body_size 200m` e `proxy_request_buffering off`, e resolve o nome `api` pelo DNS do Docker com TTL curto. Tudo que é da `api` fica sob `/api/`, inclusive o documento OpenAPI. No navegador, o upload usa `XMLHttpRequest` via JS interop em vez do `HttpClient` do Blazor.
+Um único serviço `proxy` (`nginxinc/nginx-unprivileged:1.30-alpine`) serve os estáticos do Blazor e repassa `/api/` para a `api` na rede `internal`. Só ele publica porta e só ele está na rede `public`. O nginx usa `client_max_body_size 200m` e `proxy_request_buffering off`, e resolve o nome `api` pelo DNS do Docker com TTL curto. Tudo que é da `api` fica sob `/api/`, inclusive o documento OpenAPI. No navegador, o upload usa `XMLHttpRequest` via JS interop em vez do `HttpClient` do Blazor.
 
 ## Alternativas consideradas
 
@@ -26,3 +26,4 @@ Um único serviço `proxy` (`nginxinc/nginx-unprivileged:1.29-alpine`) serve os 
 - O JS checa o tamanho antes do envio: o `413` do nginx fecha a conexão no meio do upload e o navegador o reporta como erro de rede.
 - O `/health` da `api` não é exposto; o healthcheck do `proxy` só cobre o nginx, e a dependência `api` *healthy* fica no `depends_on`.
 - A imagem do `proxy` não é .NET e tem shell (alpine); a prova de segurança só exige que ela não rode como root.
+- O Dockerfile do `proxy` roda `apk upgrade` sobre a base: a tag oficial `1.30-alpine` não acompanha cada correção do Alpine. Com o cache `type=gha`, a camada do upgrade é reaproveitada até a base ou o Dockerfile mudar; uma CVE nova aparece no gate do Trivy e se resolve rebuildando sem cache.

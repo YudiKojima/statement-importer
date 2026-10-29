@@ -27,7 +27,7 @@ Importar o arquivo dentro da requisição HTTP causa: timeout em arquivos grande
 
 | Serviço | Imagem final | Redes | Porta publicada |
 |---|---|---|---|
-| `proxy` | `nginxinc/nginx-unprivileged:1.29-alpine` + estáticos do Blazor | `public`, `internal` | **8080** (única) |
+| `proxy` | `nginxinc/nginx-unprivileged:1.30-alpine` + estáticos do Blazor | `public`, `internal` | **8080** (única) |
 | `api` | `mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled` + binário Native AOT | `internal` | — |
 | `worker` | `mcr.microsoft.com/dotnet/runtime:10.0-noble-chiseled` | `internal` | — |
 | `migrator` | `runtime-deps:10.0-noble-chiseled` + EF Core migration bundle self-contained | `internal` | — |
@@ -227,7 +227,7 @@ Mudar código não invalida a camada de `restore`. O `migrator` e o `proxy` não
 | `api` | `runtime-deps:10.0-noble-chiseled` (5 MB) + AOT | < 25 MB | Exposta ao tráfego: startup rápido, pouca memória, superfície mínima. Spike com todas as dependências: 17 MB |
 | `worker` | `runtime:10.0-noble-chiseled` (42 MB) | < 70 MB | EF Core depende de reflection → sem AOT, mas chiseled e sem root |
 | `migrator` | `runtime-deps:10.0-noble-chiseled` (5 MB) + bundle self-contained | < 60 MB | Executa uma vez e sai |
-| `proxy` | `nginxinc/nginx-unprivileged:1.29-alpine` (23 MB) | < 40 MB | Runtime final não é .NET; versão sem root (UID 101), escuta na 8080. Medido: 28,4 MB |
+| `proxy` | `nginxinc/nginx-unprivileged:1.30-alpine` (25 MB) | < 40 MB | Runtime final não é .NET; versão sem root (UID 101), escuta na 8080. `apk upgrade` no build: a tag oficial demora a receber correções do Alpine. Medido: 32,7 MB |
 
 As metas são calibradas no primeiro build real de cada serviço (fases 01 e 02) e fixadas no `image-size.sh`.
 
@@ -251,7 +251,7 @@ Decisões: [ADR 0001](decisions/0001-api-aot-worker-ef-core.md), [ADR 0002](deci
 - `worker`: `deploy.resources.limits` de **0.5 CPU e 256 MB** ([ADR 0004](decisions/0004-limite-de-recursos-no-worker.md)).
 - Redes: `public` (proxy) e `internal` (todos; `internal: true` no compose para não ter saída para a internet).
 - Labels OCI (`org.opencontainers.image.source`, `.version`, `.revision`) via build args.
-- Imagens de terceiros com tag de versão (`postgres:17-alpine`, `rabbitmq:4-management-alpine`, `nginx-unprivileged:1.29-alpine`), nunca `latest` nem tags sem versão como `alpine`.
+- Imagens de terceiros com tag de versão (`postgres:17-alpine`, `rabbitmq:4-management-alpine`, `nginx-unprivileged:1.30-alpine`), nunca `latest` nem tags sem versão como `alpine`.
 
 ---
 

@@ -27,10 +27,11 @@ O desenho completo está em [`../../architecture/system-design.md`](../../archit
 ```
 restore  → COPY só global.json, Directory.*.props, csproj do Web e os arquivos linkados → dotnet restore
 publish  → COPY do código → dotnet publish -c Release; apaga os *.br
-runtime  → nginxinc/nginx-unprivileged:1.29-alpine + docker/nginx.conf + wwwroot publicado
+runtime  → nginxinc/nginx-unprivileged:1.30-alpine + docker/nginx.conf + wwwroot publicado
 ```
 
 - O runtime final não é .NET: nginx sem root (UID 101), escutando na 8080. Meta: **< 40 MB** comprimido.
+- `apk upgrade` no runtime (como root, voltando ao UID 101): a tag oficial demora a ser reconstruída com as correções do Alpine. No primeiro CI, a `1.29-alpine` trazia `brotli-libs` com CVE CRITICAL corrigida e o gate do Trivy falhou; a base passou para a `1.30-alpine` (nginx stable, Alpine 3.24), que com o upgrade fica sem CVE HIGH/CRITICAL e com 32,7 MB, contra 38,0 MB da `1.29` com o mesmo upgrade.
 - Os `.br` saem da imagem porque o nginx da imagem oficial não tem o módulo brotli; os `.gz` ficam para o `gzip_static`.
 - Labels OCI (`VERSION`, `REVISION`) como nos outros Dockerfiles.
 - Sem target `reference` e sem estágio `dev` (ver Decisão 5).
