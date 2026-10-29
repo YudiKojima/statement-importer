@@ -14,7 +14,9 @@ done
 
 [ "$(json_field "$(curl -sf "$API/api/imports/$id")" status)" = processing ] \
   || fail "importação já tinha terminado antes do kill; a prova não é conclusiva"
-victim=$(docker compose ps -q worker | head -1)
+# Sem pipe para head: se o head fecha antes, o docker compose sai com 255 (EPIPE) e o pipefail derruba a prova.
+victim=$(docker compose ps -q worker)
+victim=${victim%%$'\n'*}
 docker kill "$victim" >/dev/null
 echo "worker $(docker inspect -f '{{.Name}}' "$victim") morto com a importação em andamento"
 
