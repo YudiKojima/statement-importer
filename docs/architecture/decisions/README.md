@@ -20,6 +20,8 @@ Ao tomar uma decisão que afeta mais de um arquivo ou que alguém poderia questi
 | [0003](0003-processamento-em-blocos-idempotente.md) | Processamento em blocos idempotente, ack só após commit |
 | [0004](0004-limite-de-recursos-no-worker.md) | Limite de CPU e memória no worker |
 | [0005](0005-schema-do-ef-core-aplicado-por-migrator.md) | Schema dono do EF Core, aplicado por container migrator one-shot |
+| [0006](0006-papeis-de-banco-com-privilegio-minimo.md) | Papéis de banco com privilégio mínimo: superusuário só no bootstrap |
+| [0007](0007-provas-executaveis-contra-o-stack-real.md) | Provas executáveis em bash contra o stack real; Trivy comparativo |
 
 ## Template
 

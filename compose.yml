@@ -3,7 +3,6 @@ name: statement-importer
 x-db-env: &db-env
   Db__Host: postgres
   Db__Database: statement_importer
-  Db__Username: importer
 
 x-rabbitmq-env: &rabbitmq-env
   RabbitMq__Host: rabbitmq
@@ -19,13 +18,16 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: statement_importer
-      POSTGRES_USER: importer
-      POSTGRES_PASSWORD_FILE: /run/secrets/Db__Password
-    secrets: [Db__Password]
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password, db_owner_password, db_app_password]
+    configs:
+      - source: init-roles
+        target: /docker-entrypoint-initdb.d/10-init-roles.sh
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U importer -d statement_importer"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d statement_importer"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -51,8 +53,12 @@ services:
       target: runtime
       args: *build-args
     image: ghcr.io/yudikojima/statement-importer-migrator:${TAG:-local}
-    environment: *db-env
-    secrets: [Db__Password]
+    environment:
+      <<: *db-env
+      Db__Username: importer_owner
+    secrets:
+      - source: db_owner_password
+        target: Db__Password
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,7 +74,10 @@ services:
     image: ghcr.io/yudikojima/statement-importer-api:${TAG:-local}
     environment:
       <<: [*db-env, *rabbitmq-env]
-    secrets: [Db__Password]
+      Db__Username: importer_app
+    secrets:
+      - source: db_app_password
+        target: Db__Password
     volumes:
       - uploads:/data/uploads
     ports:
@@ -90,7 +99,10 @@ services:
     image: ghcr.io/yudikojima/statement-importer-worker:${TAG:-local}
     environment:
       <<: [*db-env, *rabbitmq-env]
-    secrets: [Db__Password]
+      Db__Username: importer_app
+    secrets:
+      - source: db_app_password
+        target: Db__Password
     volumes:
       - uploads:/data/uploads:ro
     depends_on:
@@ -107,8 +119,16 @@ services:
     networks: [internal]
 
 secrets:
-  Db__Password:
-    file: ./secrets/db_password.txt
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  db_owner_password:
+    file: ./secrets/db_owner_password.txt
+  db_app_password:
+    file: ./secrets/db_app_password.txt
+
+configs:
+  init-roles:
+    file: ./docker/postgres/init-roles.sh
 
 volumes:
   pgdata:

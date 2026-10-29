@@ -12,6 +12,7 @@
 | Fase | Pasta |
 |---|---|
 | 01 — Núcleo do pipeline | [`features/01-pipeline-core/`](features/01-pipeline-core/) |
+| 03 — Provas executáveis e CI | [`features/03-provas-e-ci/`](features/03-provas-e-ci/) |
 
 ## Convenções
 

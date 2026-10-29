@@ -33,7 +33,7 @@ Plugin: **`superpowers`**
 2. `/writing-plans` → plano aprovado → salvo em `docs/features/NN-nome/plan.md`
 3. `/using-git-worktrees` → branch `dev/{descricao}` a partir do `master`
 4. `/executing-plans` → implementação com checkpoints
-5. `/verification-before-completion` → `dotnet build StatementImporter.slnx` + `dotnet test` + `docker compose build` + `docker compose up -d --wait`
+5. `/verification-before-completion` → `dotnet build StatementImporter.slnx` + `dotnet test` + `docker compose build` + `docker compose up -d --wait` + `bash proofs/run-all.sh`
 6. `/requesting-code-review`
 7. `/finishing-a-development-branch` → `project-overview.md` com a fase marcada `✅ Concluída (AAAA-MM-DD)` **no mesmo commit final** → PR aberto
 
