@@ -1,4 +1,5 @@
 # Desenvolvimento: docker compose -f compose.yml -f compose.dev.yml watch
+# Acesso pelo proxy em localhost:8080 (a api não publica porta, nem no dev).
 # postgres e rabbitmq entram também na rede public: porta publicada não responde em rede internal-only.
 services:
   postgres:
@@ -57,5 +58,20 @@ services:
           path: ./src/StatementImporter.Data
           target: /src/src/StatementImporter.Data
           ignore: [bin/, obj/]
+        - action: rebuild
+          path: ./Directory.Packages.props
+
+  proxy:
+    develop:
+      watch:
+        - action: rebuild
+          path: ./src/StatementImporter.Web
+          ignore: [bin/, obj/]
+        - action: rebuild
+          path: ./docker/nginx.conf
+        - action: rebuild
+          path: ./src/StatementImporter.Contracts/Http/Responses.cs
+        - action: rebuild
+          path: ./src/StatementImporter.Contracts/Statuses.cs
         - action: rebuild
           path: ./Directory.Packages.props

@@ -1,0 +1,116 @@
+@page "/"
+@implements IAsyncDisposable
+@inject ImportsApi Api
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<PageTitle>Importações</PageTitle>
+<h1>Importações</h1>
+
+<section class="card upload">
+    <input type="file" accept=".csv,text/csv" @ref="fileInput" disabled="@uploading" />
+    <button @onclick="UploadAsync" disabled="@uploading">Enviar</button>
+    @if (uploading)
+    {
+        <progress max="100" value="@uploadPercent"></progress>
+        <span>@uploadPercent% enviado</span>
+    }
+    @if (message is not null)
+    {
+        <p class="message error">@message</p>
+    }
+</section>
+
+@if (imports is null)
+{
+    <p>Carregando…</p>
+}
+else if (imports.Count == 0)
+{
+    <p>Nenhuma importação ainda. Envie um CSV acima.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr>
+                <th>Arquivo</th><th>Status</th><th class="num">Linhas</th><th class="num">Válidas</th>
+                <th class="num">Rejeitadas</th><th>Enviado em</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var import in imports)
+            {
+                <tr>
+                    <td><a href="imports/@import.Id">@import.FileName</a></td>
+                    <td><StatusBadge Status="@import.Status" /></td>
+                    <td class="num">@import.TotalLines.ToString("N0")</td>
+                    <td class="num">@import.ValidCount.ToString("N0")</td>
+                    <td class="num">@import.ErrorCount.ToString("N0")</td>
+                    <td>@import.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private sealed record UploadResult(int Status, string Body);
+
+    private IReadOnlyList<ImportResponse>? imports;
+    private ElementReference fileInput;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<Home>? selfRef;
+    private bool uploading;
+    private int uploadPercent;
+    private string? message;
+
+    protected override async Task OnInitializedAsync() => imports = await Api.ListAsync();
+
+    private async Task UploadAsync()
+    {
+        message = null;
+        uploadPercent = 0;
+        uploading = true;
+        module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/upload.js");
+        selfRef ??= DotNetObjectReference.Create(this);
+        var result = await module.InvokeAsync<UploadResult>("upload", fileInput, selfRef);
+        uploading = false;
+
+        switch (result.Status)
+        {
+            case 202:
+                Nav.NavigateTo($"imports/{ImportsApi.ParseImport(result.Body)!.Id}");
+                break;
+            case 200:
+                Nav.NavigateTo($"imports/{ImportsApi.ParseImport(result.Body)!.Id}?existente=true");
+                break;
+            case 400:
+                message = ImportsApi.ParseError(result.Body) ?? "Arquivo inválido.";
+                break;
+            case 413:
+                message = "Arquivo acima de 200 MB.";
+                break;
+            case -1:
+                message = "Escolha um arquivo CSV.";
+                break;
+            default:
+                message = result.Status == 0 ? "Falha de rede no envio." : $"Falha no envio (HTTP {result.Status}).";
+                break;
+        }
+    }
+
+    [JSInvokable]
+    public void OnUploadProgress(double loaded, double total)
+    {
+        uploadPercent = (int)(loaded * 100 / total);
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        selfRef?.Dispose();
+        if (module is not null)
+            await module.DisposeAsync();
+    }
+}

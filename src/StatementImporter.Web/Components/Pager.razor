@@ -1,0 +1,14 @@
+<div class="pager">
+    <button disabled="@(Page <= 1)" @onclick="() => Changed.InvokeAsync(Page - 1)">Anterior</button>
+    <span>Página @Page de @Pages.ToString("N0")</span>
+    <button disabled="@(Page >= Pages)" @onclick="() => Changed.InvokeAsync(Page + 1)">Próxima</button>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public int Page { get; set; }
+    [Parameter, EditorRequired] public long Total { get; set; }
+    [Parameter, EditorRequired] public int PageSize { get; set; }
+    [Parameter] public EventCallback<int> Changed { get; set; }
+
+    private long Pages => Math.Max(1, (Total + PageSize - 1) / PageSize);
+}

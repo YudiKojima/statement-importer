@@ -53,7 +53,7 @@ jobs:
         with:
           source: .
           files: compose.yml
-          targets: migrator,api,worker
+          targets: migrator,api,worker,proxy
           load: true
           set: |
             migrator.cache-from=type=gha,scope=migrator
@@ -62,6 +62,8 @@ jobs:
             api.cache-to=type=gha,scope=api,mode=max
             worker.cache-from=type=gha,scope=worker
             worker.cache-to=type=gha,scope=worker,mode=max
+            proxy.cache-from=type=gha,scope=proxy
+            proxy.cache-to=type=gha,scope=proxy,mode=max
 
       - name: Build da referência (api)
         uses: docker/build-push-action@v7.4.0
@@ -98,7 +100,7 @@ jobs:
 
       - name: Trivy — gate (CRITICAL com correção)
         run: |
-          for svc in api worker migrator; do
+          for svc in api worker migrator proxy; do
             docker run --rm -e TRIVY_DB_REPOSITORY -e TRIVY_JAVA_DB_REPOSITORY -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache "$TRIVY_IMAGE" \
               image --quiet --severity CRITICAL --ignore-unfixed --exit-code 1 "ghcr.io/yudikojima/statement-importer-$svc:local"
           done
@@ -146,16 +148,17 @@ jobs:
         with:
           source: .
           files: compose.yml
-          targets: migrator,api,worker
+          targets: migrator,api,worker,proxy
           push: true
           set: |
             migrator.cache-from=type=gha,scope=migrator
             api.cache-from=type=gha,scope=api
             worker.cache-from=type=gha,scope=worker
+            proxy.cache-from=type=gha,scope=proxy
 
       - name: Tag latest
         run: |
-          for svc in api worker migrator; do
+          for svc in api worker migrator proxy; do
             image="ghcr.io/yudikojima/statement-importer-$svc"
             docker buildx imagetools create -t "$image:latest" "$image:${{ steps.tag.outputs.tag }}"
           done

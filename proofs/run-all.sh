@@ -3,7 +3,7 @@
 set -euo pipefail
 dir="$(cd "$(dirname "$0")" && pwd)"
 
-for proof in healthy network security image-size volume scale resilience; do
+for proof in healthy network proxy security image-size volume scale resilience; do
   echo "▶ $proof"
   bash "$dir/$proof.sh"
 done

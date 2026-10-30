@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+  </PropertyGroup>
+
+  <!-- Só os DTOs: o Contracts referencia Npgsql e RabbitMQ.Client, que não vão para o navegador. -->
+  <ItemGroup>
+    <Compile Include="..\StatementImporter.Contracts\Http\Responses.cs" Link="Contracts\Responses.cs" />
+    <Compile Include="..\StatementImporter.Contracts\Statuses.cs" Link="Contracts\Statuses.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

@@ -55,8 +55,8 @@ Task StopOnQueueLoss(object _, ShutdownEventArgs e)
 rabbit.ConnectionShutdownAsync += StopOnQueueLoss;
 publisher.ShutdownAsync += StopOnQueueLoss;
 
-app.MapOpenApi();
-app.MapScalarApiReference("/api/docs");
+app.MapOpenApi("/api/openapi/{documentName}.json");
+app.MapScalarApiReference("/api/docs", o => o.OpenApiRoutePattern = "/api/openapi/{documentName}.json");
 
 app.MapGet("/health", async (NpgsqlDataSource dataSource, IConnection queue, CancellationToken cancellationToken) =>
 {

@@ -1,0 +1,15 @@
+<span class="badge @Status">@Label</span>
+
+@code {
+    [Parameter, EditorRequired] public string Status { get; set; } = "";
+
+    private string Label => Status switch
+    {
+        ImportStatus.Queued => "na fila",
+        ImportStatus.Processing => "processando",
+        ImportStatus.Completed => "concluída",
+        ImportStatus.CompletedWithErrors => "concluída com erros",
+        ImportStatus.Failed => "falhou",
+        _ => Status
+    };
+}
