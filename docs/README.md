@@ -14,6 +14,7 @@
 | 01 — Núcleo do pipeline | [`features/01-pipeline-core/`](features/01-pipeline-core/) |
 | 02 — Frontend e reverse proxy | [`features/02-frontend-e-proxy/`](features/02-frontend-e-proxy/) |
 | 03 — Provas executáveis e CI | [`features/03-provas-e-ci/`](features/03-provas-e-ci/) |
+| 04 — README de portfólio e demo | [`features/04-readme-e-demo/`](features/04-readme-e-demo/) |
 
 ## Convenções
 
