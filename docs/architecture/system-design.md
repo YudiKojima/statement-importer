@@ -54,6 +54,7 @@ statement-importer/
 │  ├─ StatementImporter.UnitTests/
 │  └─ StatementImporter.IntegrationTests/   Testcontainers (Postgres + RabbitMQ)
 ├─ tools/generate-csv.cs              file-based app .NET 10 para gerar arquivos de demo
+├─ tools/demo/                        gravador do GIF da demo (Playwright + ffmpeg em container)
 ├─ proofs/                            provas executáveis (bash)
 ├─ docker/nginx.conf
 ├─ docker/postgres/init-roles.sh      cria os papéis do Postgres no primeiro boot
@@ -297,4 +298,4 @@ Somente em push na `master`: publica `ghcr.io/yudikojima/statement-importer-{api
 
 ### README (entregável de portfólio)
 
-Problema → diagrama Mermaid → `docker compose up` → GIF da demo → tabela de medições → decisões (links para os ADRs) → como rodar as provas → badge do CI.
+Em inglês (`docs/` e ADRs seguem em português). Badge do CI → problema → GIF da demo → diagrama Mermaid → `docker compose up` → tabela de medições → decisões (links para os ADRs) → como rodar as provas → como regravar a demo. O GIF é gerado por `tools/demo/record.sh`, ferramenta manual fora do CI.
