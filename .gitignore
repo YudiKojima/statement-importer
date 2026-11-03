@@ -7,3 +7,4 @@ secrets/*.txt
 !secrets/*.example
 data/
 TestResults/
+tools/demo/node_modules/
